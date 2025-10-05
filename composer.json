@@ -1,0 +1,21 @@
+{
+  "name": "weblivehub/sdk",
+  "description": "WebLiveHub PHP SDK (Composer version)",
+  "type": "library",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "WebLiveHub\\SDK\\": "src/"
+    }
+  },
+  "authors": [
+    {
+      "name": "WebLiveHub",
+      "email": "support@weblivehub.com"
+    }
+  ],
+  "require": {
+    "php": ">=7.4"
+  } 
+  
+}
