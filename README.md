@@ -47,7 +47,7 @@ Or add to your `composer.json`:
 ```json
 {
   "require": {
-    "weblivehub/sdk": "^1.0.2"
+    "weblivehub/sdk": "^1.0.3"
   }
 }
 ```
@@ -242,7 +242,6 @@ Generate the `<script>` tag to load the embed.js library.
 **Example:**
 ```php
 echo WLSDK::script();
-// Output: <script src="https://console.weblivehub.com/sdk-assets/v1_0_2/js/embed.js"></script>
 ```
 
 **Note:** Call this once per page, typically in the `<head>` or before any iframe embeds.
@@ -369,11 +368,13 @@ echo WLSDK::iframe(['hostLabel' => 'live', 'streamer' => 'streamer_user_id']);
 
 ## 🔄 Changelog
 
-### v1.0.2 (Current)
+### v1.0.3
 - Hosted Backend slug detection
 - Versioned asset path support with fallback
 - Enhanced error handling
 - Improved CDN configuration
+
+### v1.0.3 (Current)
 
 ---
 

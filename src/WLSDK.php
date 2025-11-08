@@ -6,8 +6,8 @@ namespace WebLiveHub\SDK;
  * NOTE: This is an initial migrated copy; will be refined (DI, exceptions, no inline style) in later steps.
  */
 class WLSDK {
-  public const VERSION = '1.0.2';
-  public const VERSION_CODE = 'v1_0_2';
+  public const VERSION = '1.0.3';
+  public const VERSION_CODE = 'v1_0_3';
   private static array $config = [];
   private static ?string $lastError = null;
   private static ?string $SDK_CDN_BASE = null;
