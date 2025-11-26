@@ -47,7 +47,7 @@ Or add to your `composer.json`:
 ```json
 {
   "require": {
-    "weblivehub/sdk": "^1.0.3"
+    "weblivehub/sdk": "^1.0.4"
   }
 }
 ```
@@ -76,7 +76,7 @@ use WebLiveHub\SDK\WLSDK;
 
 // Configure SDK
 WLSDK::setup([
-    'hb_endpoint' => 'https://console.weblivehub.com/WL_HOST/{your-slug}/wl_api/backend.php',
+    'hb_endpoint' => '{your-generated-endpoint}',
     'user_id' => 'client_user_id',      // Your WebLiveHub user ID
     'password' => 'client_password',    // Your WebLiveHub password
 ]);
@@ -368,13 +368,17 @@ echo WLSDK::iframe(['hostLabel' => 'live', 'streamer' => 'streamer_user_id']);
 
 ## 🔄 Changelog
 
-### v1.0.3
+### v1.0.2
 - Hosted Backend slug detection
 - Versioned asset path support with fallback
 - Enhanced error handling
 - Improved CDN configuration
 
-### v1.0.3 (Current)
+### v1.0.3
+Updated hostLabel links
+
+### v1.0.4 (Current)
+Added event listeners for WLSDK::iframe and WLSDK::lazyIframe
 
 ---
 

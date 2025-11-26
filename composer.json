@@ -1,6 +1,6 @@
 {
   "name": "weblivehub/sdk",
-  "description": "WebLiveHub PHP SDK v1.0.3 (Composer version)",
+  "description": "WebLiveHub PHP SDK v1.0.4 (Composer version)",
   "type": "library",
   "license": "MIT",
   "autoload": {

@@ -1,19 +1,19 @@
 <?php
 namespace WebLiveHub\SDK;
-
 /**
  * WLSDK (Composer version skeleton)
  * NOTE: This is an initial migrated copy; will be refined (DI, exceptions, no inline style) in later steps.
  */
 class WLSDK {
-  public const VERSION = '1.0.3';
-  public const VERSION_CODE = 'v1_0_3';
+  public const VERSION = '1.0.4';
+  public const VERSION_CODE = 'v1_0_4'; 
   private static array $config = [];
   private static ?string $lastError = null;
   private static ?string $SDK_CDN_BASE = null;
 
   private static $is_slug = false; // >=1.0.1-dev
   private static $slug = null; 
+  
 
   private static $DEFAULT_CND_BASE = 'https://console.weblivehub.com'; 
 
@@ -37,7 +37,32 @@ class WLSDK {
     return self::$DEFAULT_CND_BASE;
   }
 
+  /** Resolve UI language for embedding (i18n-aware when available) */
+  private static function resolveLang(array $opts): ?string {
+    // 1) Explicit option wins
+    $lang = isset($opts['lang']) ? trim((string)$opts['lang']) : '';
+    if ($lang !== '') return $lang;
+
+    // 2) Console i18n integration if available
+    if (function_exists('wlh_get_lang')) {
+      try {
+        $lang = (string)\wlh_get_lang();
+        if ($lang !== '') return $lang;
+      } catch (\Throwable $e) { /* ignore */ }
+    }
+
+    // 3) If default constant is defined in host app
+    if (defined('WLH_I18N_DEFAULT')) {
+      $def = (string)constant('WLH_I18N_DEFAULT');
+      if ($def !== '') return $def;
+    }
+
+    // 4) Safe fallback
+    return 'en';
+  }
+
   public static function setup(array $config): bool {
+  
     self::$config = $config + self::$config;
     // Normalize hb_endpoint if provided without scheme so that HTTP request executes PHP instead of reading source.
     if (!empty(self::$config['hb_endpoint']) && is_string(self::$config['hb_endpoint'])) {
@@ -51,6 +76,7 @@ class WLSDK {
           $b = $scheme . '://' . $host . '/' . ltrim($b, '/'); // relative path
         }
       }
+
       // Hosted backend slug detection (>=1.0.1): pattern /WL_HOST/<40hex>/wl_api/backend*.php
       if (preg_match('#/WL_HOST/([a-f0-9]{40})/wl_api/backend[^/]*\.php$#i', $b, $m)) {
         self::$slug = $m[1];
@@ -58,6 +84,7 @@ class WLSDK {
       }
       self::$config['hb_endpoint'] = $b;
     }
+
     self::$lastError = null;
     return true;
   }
@@ -82,6 +109,17 @@ class WLSDK {
     return '<script src="'.$cdnBase.$versionedPath.'" onerror="this.onerror=null;this.src=\''.$cdnBase.$legacyPath.'\'"></script>';
   }
 
+  private static function getClientIp(): string {
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+        return trim($ips[0]);
+    }
+    if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
+        return trim($_SERVER['HTTP_X_REAL_IP']);
+    }
+    return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+  }
+
   /** Internal helper to POST application/x-www-form-urlencoded */
   private static function postForm(string $url, array $fields, int $timeout = 15): array {
     $payload = http_build_query($fields, '', '&');
@@ -99,7 +137,8 @@ class WLSDK {
         CURLOPT_HTTPHEADER => [
           'Content-Type: application/x-www-form-urlencoded',
           'Accept: application/json',
-          'User-Agent: WLSDK/'.self::VERSION
+          'User-Agent: '.$_SERVER['HTTP_USER_AGENT'],
+          'X-Real-IP: '.self::getClientIp(),
         ],
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => $timeout,
@@ -194,7 +233,7 @@ class WLSDK {
       $statusOk = ($data['success'] === true || $data['success'] === 1 || $data['success'] === '1');
     }
     if (!$statusOk) {
-      self::$lastError = $data['message'] ?? $data['err'] ?? 'Request failed';
+      self::$lastError = $data['message'] ?? $data['__err'] ?? 'Request failed';
       return null;
     }
     $token = $data['data']['token'] ?? $data['token'] ?? null;
@@ -274,6 +313,7 @@ class WLSDK {
       $msg = htmlspecialchars(self::$lastError ?? 'Unknown error', ENT_QUOTES, 'UTF-8');
       return '<div class="wl-stream-error">' . $msg . '</div>';
     }
+    $lang = self::resolveLang($opts);
     $attrsInput = is_array($opts['attrs'] ?? null) ? $opts['attrs'] : [];
     $id = $opts['id'] ?? ($attrsInput['id'] ?? ('wlstream_' . substr(bin2hex(random_bytes(6)), 0, 12)));
     $basePairs = [
@@ -281,6 +321,7 @@ class WLSDK {
       'host-label' => $hostLabel,
       'iframe-token' => $token,
     ];
+    if ($lang) { $basePairs['lang'] = $lang; }
     $attrs = $attrsInput;
     $reserved = ['host-label','iframe-token','id'];
     foreach ($attrs as $k => $v) {
@@ -326,46 +367,79 @@ class WLSDK {
       }
       $authToken = self::$config['authToken'];
     }
-     
-    if(!self::$is_slug){ // >= 1.0.1
+    $lang = self::resolveLang($opts);
+    // Normalize attrs and id handling (mirror iframe behavior)
+    $attrsInput = is_array($opts['attrs'] ?? null) ? $opts['attrs'] : [];
+    $id = $opts['id'] ?? ($attrsInput['id'] ?? ('wlstream_' . substr(bin2hex(random_bytes(6)), 0, 12)));
+
+    if (!self::$is_slug) { // >= 1.0.1
       $hb_endpoint = self::$config['hb_endpoint'] ?? ($opts['hb_endpoint'] ?? '');
-      if ($hb_endpoint === '') { 
-        return '<div class="wl-stream-error">hb_endpoint missing</div>'; 
+      if ($hb_endpoint === '') {
+        return '<div class="wl-stream-error">hb_endpoint missing</div>';
       }
       $pairs = [
+        'id' => $id,
         'host-label' => $hostLabel,
         'streamer' => $streamer,
         'wl-endpoint' => $hb_endpoint
-      ]; 
-      if ($authToken !== '') $pairs['auth-token'] = $authToken; 
-      $extra = is_array($opts['attrs'] ?? null) ? $opts['attrs'] : []; 
-      foreach ($extra as $k => $v) { 
-        if (!is_string($k) || $k === '' || isset($pairs[$k])) continue; 
+      ];
+      if ($authToken !== '') $pairs['auth-token'] = $authToken;
+      if ($lang) { $pairs['lang'] = $lang; }
+
+      $reserved = ['host-label','streamer','wl-endpoint','auth-token','id'];
+      $extra = $attrsInput;
+      foreach ($extra as $k => $v) {
+        if (!is_string($k) || $k === '') continue;
+        $lower = strtolower($k);
+        if (in_array($lower, $reserved, true)) continue;
+        if (!preg_match('/^[a-zA-Z0-9_:-]+$/', $k)) continue;
         if ($v === true) {
           $pairs[$k] = null;
         } elseif ($v !== false && $v !== null) {
           $pairs[$k] = (string)$v;
-        } 
-      } 
+        }
+      }
+    } else {
+      $pairs = [
+        'id' => $id,
+        'host-label' => $hostLabel,
+        'streamer' => $streamer
+      ];
+      if ($authToken !== '') $pairs['auth-token'] = $authToken;
+      if ($lang) { $pairs['lang'] = $lang; }
+
+      $reserved = ['host-label','streamer','auth-token','id'];
+      $extra = $attrsInput;
+      foreach ($extra as $k => $v) {
+        if (!is_string($k) || $k === '' || isset($pairs[$k])) continue;
+        $lower = strtolower($k);
+        if (in_array($lower, $reserved, true)) continue;
+        if (!preg_match('/^[a-zA-Z0-9_:-]+$/', $k)) continue;
+        if ($v === true) {
+          $pairs[$k] = null;
+        } elseif ($v !== false && $v !== null) {
+          $pairs[$k] = (string)$v;
+        }
+      }
     }
-    else{
-      $pairs=[
-        'host-label'=>$hostLabel,
-        'streamer'=>$streamer
-      ]; 
-      if($authToken!=='')
-        $pairs['auth-token'] = $authToken;
-      $extra = is_array($opts['attrs'] ?? null) ? $opts['attrs'] : []; foreach($extra as $k=>$v){ 
-        if(!is_string($k)||$k===''||isset($pairs[$k])) 
-          continue;
-        if($v===true){ 
-          $pairs[$k]=null; 
-        } elseif($v!==false && $v!==null){ 
-          $pairs[$k]=(string)$v; 
-        } 
-      } 
+
+    $html = '<wl-stream-lazy ' . self::buildAttributes($pairs) . '></wl-stream-lazy>';
+
+    // Events support (mirror iframe): attach inline script that binds handlers to element by id
+    $events = is_array($opts['events'] ?? null) ? $opts['events'] : [];
+    if ($events) {
+      $lines = [];
+      foreach ($events as $evt => $handlerBody) {
+        if (!is_string($evt) || !preg_match('/^[a-zA-Z0-9_:-]+$/', $evt)) continue;
+        if (!is_string($handlerBody) || $handlerBody === '') continue;
+        $safeBody = str_replace(['</script','<script'], ['</scri'.'pt','<scri'.'pt'], $handlerBody);
+        $lines[] = 'el.addEventListener(' . json_encode($evt) . ', function(event){ try { ' . $safeBody . ' } catch(e){ console.error("WLSDK event handler error", e); } });';
+      }
+      if ($lines) {
+        $html .= "\n<script>(function(){var el=document.getElementById(" . json_encode($id) . ");if(!el)return;" . implode('', $lines) . "})();</script>";
+      }
     }
-    
-    return '<wl-stream-lazy ' . self::buildAttributes($pairs) . '></wl-stream-lazy>';
+
+    return $html;
   }
 }
